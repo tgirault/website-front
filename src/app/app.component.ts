@@ -1,16 +1,13 @@
 import { MediaMatcher } from '@angular/cdk/layout';
-import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
+import { HttpClient, HttpHeaders, HttpRequest, HttpHandler, HttpEvent } from '@angular/common/http';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
-
-export interface Language {
-  value: string;
-  viewValue: string;
-}
-
-export interface Menu {
-  label: string;
-  path: string;
-}
+import { Language } from './model/language';
+import { Menu } from './model/menu';
+import { Message } from './model/message';
+import { RestApiService } from './rest-api.service';
+import { Observable } from 'rxjs';
+import { environment } from '@environments/environment';
 
 /**
  * Composant principal.
@@ -21,43 +18,73 @@ export interface Menu {
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
 })
-export class AppComponent implements OnDestroy {
+export class AppComponent implements OnInit, OnDestroy {
 
-  languages: Language[] = [
-    { value: 'fr', viewValue: 'Français' },
-    { value: 'en', viewValue: 'English' }
-  ];
-
-  menus: Menu[] = [
-    { label: 'Accueil', path: '/home' },
-    { label: 'Réservation', path: '/booking' },
-    { label: 'Contact', path: '/contact' },
-  ]
-
+  languages: Language[];
+  menus: Menu[];
   language: string;
 
   mobileQuery: MediaQueryList;
 
   content = 'Mon texte';
 
-  private _mobileQueryListener: () => void;
+  private mobileQueryListener: () => void;
 
   /**
    * Constructeur du composant.
    * @param translate service de gestion des traductions
    */
-  constructor(private translate: TranslateService, changeDetectorRef: ChangeDetectorRef, media: MediaMatcher) {
+  // tslint:disable-next-line:max-line-length
+  constructor(private httpClient: HttpClient, private translate: TranslateService, changeDetectorRef: ChangeDetectorRef, media: MediaMatcher) {
     translate.setDefaultLang('fr');
     this.mobileQuery = media.matchMedia('(max-width: 600px)');
-    this._mobileQueryListener = () => changeDetectorRef.detectChanges();
-    this.mobileQuery.addListener(this._mobileQueryListener);
+    this.mobileQueryListener = () => changeDetectorRef.detectChanges();
+    this.mobileQuery.addListener(this.mobileQueryListener);
   }
 
   useLanguage() {
     this.translate.use(this.language);
+
+    const options = {
+      headers: new HttpHeaders({
+        'Access-Control-Allow-Origin': '*',
+        Authorization: 'Basic dXNlcjpwYXNzdzByZA==',
+        'Accept-Language': this.language
+      })
+    };
+
+    this.httpClient.get<Message>(environment.apiUrl + '/message/greeting', options).subscribe(response => {
+      this.content = response.message;
+    });
+
+
+    this.httpClient.get<Menu[]>(environment.apiUrl + '/menu', options) //
+      .subscribe(response => this.menus = response);
+  }
+
+  ngOnInit() {
+    this.languages = [{
+      value: 'fr',
+      viewValue: 'fr'
+    },
+    {
+      value: 'en',
+      viewValue: 'en'
+    }];
+
+    const options = {
+      headers: new HttpHeaders({
+        'Access-Control-Allow-Origin': '*',
+        Authorization: 'Basic dXNlcjpwYXNzdzByZA==',
+        'Accept-Language': this.language
+      })
+    };
+
+    this.httpClient.get<Menu[]>(environment.apiUrl + '/menu', options) //
+      .subscribe(response => this.menus = response);
   }
 
   ngOnDestroy(): void {
-    this.mobileQuery.removeListener(this._mobileQueryListener);
+    this.mobileQuery.removeListener(this.mobileQueryListener);
   }
 }
